@@ -19,6 +19,7 @@ package markdown
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -133,25 +134,46 @@ type external struct {
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	_, ok := mg.(*v1alpha1.Markdown)
+	cr, ok := mg.(*v1alpha1.Markdown)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotMarkdown)
 	}
+
+	// Create archive folder and ignore error if it already exist
+	os.Mkdir("archive", os.ModePerm)
+
+	// Check if file exist
+	fileexist := true
+	if _, err := os.Stat(fmt.Sprintf("archive/%s.txt", cr.Name)); err == nil {
+		fileexist = true
+	} else {
+		fileexist = false
+	}
+
+	// Check if up to date
+	// Desired html should be
+	var mds = cr.Spec.ForProvider.Content
+	md := []byte(mds)
+	html := mdToHTML(md)
+	// Current html
+	b, _ := os.ReadFile(fmt.Sprintf("archive/%s.txt", cr.Name))
+
+	uptodate := string(b) == string(html)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
 		// the managed resource reconciler know that it needs to call Create to
 		// (re)create the resource, or that it has successfully been deleted.
-		// ResourceExists: true,
-		// ResourceUpToDate: true,
+		ResourceExists:   fileexist,
+		ResourceUpToDate: uptodate,
 
 		// Delete
 		// ResourceExists:   false,
 		// ResourceUpToDate: true,
 
 		// Create
-		ResourceUpToDate: false,
-		ResourceExists:   false,
+		// ResourceExists:   false,
+		// ResourceUpToDate: false,
 
 		// Return false when the external resource exists, but it not up to date
 		// with the desired managed resource state. This lets the managed
@@ -175,13 +197,16 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	html := mdToHTML(md)
 	fmt.Printf("\n\n\n\n\n --- HTML ---\n%s\n\n\n", html)
 
+	// archive to folder archive
+	path := fmt.Sprintf("archive/%s.txt", cr.Name)
+	f, _ := os.Create(path)
+	defer f.Close()
+	f.WriteString(fmt.Sprintf("%s", html))
+
 	// var mds = `# header
-
 	// 	Sample text.
-
 	// 	[link](http://example.com)
 	// 	`
-
 	// md := []byte(mds)
 	// html := mdToHTML(md)
 
@@ -209,11 +234,13 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	_, ok := mg.(*v1alpha1.Markdown)
-	// cr, ok := mg.(*v1alpha1.Markdown)
+	cr, ok := mg.(*v1alpha1.Markdown)
 	if !ok {
 		return errors.New(errNotMarkdown)
 	}
+
+	path := fmt.Sprintf("archive/%s.txt", cr.Name)
+	os.Remove(path)
 
 	return nil
 }
