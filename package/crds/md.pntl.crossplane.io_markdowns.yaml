@@ -5,18 +5,18 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
-  name: mytypes.sample.template.crossplane.io
+  name: markdowns.md.pntl.crossplane.io
 spec:
-  group: sample.template.crossplane.io
+  group: md.pntl.crossplane.io
   names:
     categories:
     - crossplane
     - managed
-    - template
-    kind: MyType
-    listKind: MyTypeList
-    plural: mytypes
-    singular: mytype
+    - pntl
+    kind: Markdown
+    listKind: MarkdownList
+    plural: markdowns
+    singular: markdown
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -35,7 +35,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A MyType is an example API type.
+        description: A Markdown is an example API type.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -50,7 +50,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: A MyTypeSpec defines the desired state of a MyType.
+            description: A MarkdownSpec defines the desired state of a Markdown.
             properties:
               deletionPolicy:
                 default: Delete
@@ -66,12 +66,15 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: MyTypeParameters are the configurable fields of a MyType.
+                description: MarkdownParameters are the configurable fields of a Markdown.
                 properties:
                   configurableField:
                     type: string
+                  content:
+                    type: string
                 required:
                 - configurableField
+                - content
                 type: object
               managementPolicy:
                 default: FullControl
@@ -260,17 +263,13 @@ spec:
             - forProvider
             type: object
           status:
-            description: A MyTypeStatus represents the observed state of a MyType.
+            description: A MarkdownStatus represents the observed state of a Markdown.
             properties:
               atProvider:
-                description: MyTypeObservation are the observable fields of a MyType.
+                description: MarkdownObservation are the observable fields of a Markdown.
                 properties:
-                  configurableField:
-                    type: string
                   observableField:
                     type: string
-                required:
-                - configurableField
                 type: object
               conditions:
                 description: Conditions of the resource.

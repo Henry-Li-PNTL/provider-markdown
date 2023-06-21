@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Crossplane Authors.
+Copyright 2022 The Crossplane Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mytype
+package markdown
 
 import (
 	"context"
@@ -32,13 +32,14 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/crossplane/provider-template/apis/sample/v1alpha1"
-	apisv1alpha1 "github.com/crossplane/provider-template/apis/v1alpha1"
-	"github.com/crossplane/provider-template/internal/features"
+	"github.com/crossplane/provider-pntl/apis/md/v1alpha1"
+	apisv1alpha1 "github.com/crossplane/provider-pntl/apis/v1alpha1"
+	"github.com/crossplane/provider-pntl/internal/features"
+	// "github.com/crossplane/provider-pntl/internal/controller/features"
 )
 
 const (
-	errNotMyType    = "managed resource is not a MyType custom resource"
+	errNotMarkdown  = "managed resource is not a Markdown custom resource"
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
@@ -53,16 +54,17 @@ var (
 	newNoOpService = func(_ []byte) (interface{}, error) { return &NoOpService{}, nil }
 )
 
-// Setup adds a controller that reconciles MyType managed resources.
+// Setup adds a controller that reconciles Markdown managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	name := managed.ControllerName(v1alpha1.MyTypeGroupKind)
+	name := managed.ControllerName(v1alpha1.MarkdownGroupKind)
 
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
 		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), apisv1alpha1.StoreConfigGroupVersionKind))
 	}
 
-	opts := []managed.ReconcilerOption{
+	r := managed.NewReconciler(mgr,
+		resource.ManagedKind(v1alpha1.MarkdownGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
@@ -70,20 +72,13 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
-		managed.WithConnectionPublishers(cps...),
-	}
-
-	if o.Features.Enabled(features.EnableAlphaManagementPolicies) {
-		opts = append(opts, managed.WithManagementPolicies())
-	}
-
-	r := managed.NewReconciler(mgr, resource.ManagedKind(v1alpha1.MyTypeGroupVersionKind), opts...)
+		managed.WithConnectionPublishers(cps...))
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
-		For(&v1alpha1.MyType{}).
+		For(&v1alpha1.Markdown{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
@@ -101,9 +96,9 @@ type connector struct {
 // 3. Getting the credentials specified by the ProviderConfig.
 // 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.MyType)
+	cr, ok := mg.(*v1alpha1.Markdown)
 	if !ok {
-		return nil, errors.New(errNotMyType)
+		return nil, errors.New(errNotMarkdown)
 	}
 
 	if err := c.usage.Track(ctx, mg); err != nil {
@@ -138,24 +133,30 @@ type external struct {
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.MyType)
+	_, ok := mg.(*v1alpha1.Markdown)
 	if !ok {
-		return managed.ExternalObservation{}, errors.New(errNotMyType)
+		return managed.ExternalObservation{}, errors.New(errNotMarkdown)
 	}
-
-	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing: %+v", cr)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
 		// the managed resource reconciler know that it needs to call Create to
 		// (re)create the resource, or that it has successfully been deleted.
-		ResourceExists: true,
+		// ResourceExists: true,
+		// ResourceUpToDate: true,
+
+		// Delete
+		// ResourceExists:   false,
+		// ResourceUpToDate: true,
+
+		// Create
+		ResourceUpToDate: false,
+		ResourceExists:   false,
 
 		// Return false when the external resource exists, but it not up to date
 		// with the desired managed resource state. This lets the managed
 		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: true,
+		// ResourceUpToDate: true,
 
 		// Return any details that may be required to connect to the external
 		// resource. These will be stored as the connection secret.
@@ -164,12 +165,25 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.MyType)
+	cr, ok := mg.(*v1alpha1.Markdown)
 	if !ok {
-		return managed.ExternalCreation{}, errors.New(errNotMyType)
+		return managed.ExternalCreation{}, errors.New(errNotMarkdown)
 	}
 
-	fmt.Printf("Creating: %+v", cr)
+	var mds = cr.Spec.ForProvider.Content
+	md := []byte(mds)
+	html := mdToHTML(md)
+	fmt.Printf("\n\n\n\n\n --- HTML ---\n%s\n\n\n", html)
+
+	// var mds = `# header
+
+	// 	Sample text.
+
+	// 	[link](http://example.com)
+	// 	`
+
+	// md := []byte(mds)
+	// html := mdToHTML(md)
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
@@ -179,12 +193,13 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.MyType)
+	_, ok := mg.(*v1alpha1.Markdown)
+	// cr, ok := mg.(*v1alpha1.Markdown)
 	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errNotMyType)
+		return managed.ExternalUpdate{}, errors.New(errNotMarkdown)
 	}
 
-	fmt.Printf("Updating: %+v", cr)
+	// fmt.Printf("Updating: %+v", cr)
 
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the
@@ -194,12 +209,11 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	cr, ok := mg.(*v1alpha1.MyType)
+	_, ok := mg.(*v1alpha1.Markdown)
+	// cr, ok := mg.(*v1alpha1.Markdown)
 	if !ok {
-		return errors.New(errNotMyType)
+		return errors.New(errNotMarkdown)
 	}
-
-	fmt.Printf("Deleting: %+v", cr)
 
 	return nil
 }

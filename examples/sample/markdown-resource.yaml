@@ -1,0 +1,14 @@
+apiVersion: md.pntl.crossplane.io/v1alpha1
+kind: Markdown
+metadata:
+  name: mdcontent
+spec:
+  forProvider:
+    configurableField: test
+    content: |
+      # header
+      Sample text.
+      [link](http://example.com)
+      
+  providerConfigRef:
+    name: example
